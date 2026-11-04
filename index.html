@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<!-- Chính sách bảo mật: chỉ cho tải mã từ chính trang này và Google Sign-In,
+     chỉ cho gửi dữ liệu tới 3 API AI và Google Drive. Mọi địa chỉ khác bị trình duyệt chặn. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://accounts.google.com/gsi/client;
+  style-src 'self' https://accounts.google.com/gsi/style;
+  connect-src https://api.openai.com https://generativelanguage.googleapis.com https://api.anthropic.com https://www.googleapis.com https://accounts.google.com/gsi/;
+  frame-src https://accounts.google.com/gsi/;
+  img-src 'self' data:;
+  object-src 'none'; base-uri 'none'; form-action 'none';">
+<title>Daily Scrum</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<div id="screen-loading" class="screen on"><p class="muted center">Đang tải...</p></div>
+
+<!-- Tạo kho dữ liệu lần đầu, hoặc khôi phục -->
+<div id="screen-setup" class="screen">
+  <div class="panel">
+    <h1>Daily Scrum</h1>
+    <p class="muted">Phân tích buổi daily từ file ghi âm. Mọi dữ liệu nằm trên máy của bạn và trong Google Drive của chính bạn, luôn được mã hóa.</p>
+
+    <h2>Bắt đầu mới</h2>
+    <label for="newPass">Đặt mật khẩu bảo vệ dữ liệu (ít nhất 10 ký tự)</label>
+    <input id="newPass" type="password" autocomplete="new-password">
+    <label for="newPass2">Nhập lại mật khẩu</label>
+    <input id="newPass2" type="password" autocomplete="new-password">
+    <p class="warn">Mật khẩu dùng để mã hóa API key và dữ liệu. Quên mật khẩu là mất dữ liệu, không ai khôi phục được, kể cả người làm ra app.</p>
+    <button data-action="create-vault">Tạo kho dữ liệu</button>
+
+    <h2>Đã dùng trên thiết bị khác</h2>
+    <label for="restorePass">Mật khẩu bạn đã đặt</label>
+    <input id="restorePass" type="password" autocomplete="current-password">
+    <button class="ghost" data-action="restore-drive">Khôi phục từ Google Drive</button>
+    <label for="restoreFile">Hoặc chọn file sao lưu (.dsbackup)</label>
+    <input id="restoreFile" type="file" accept=".dsbackup,application/json">
+    <button class="ghost" data-action="restore-file">Khôi phục từ file</button>
+    <p id="setupMsg" class="msg"></p>
+    <p class="muted small"><a href="#" data-action="show-privacy">Dữ liệu của bạn được xử lý thế nào?</a></p>
+  </div>
+</div>
+
+<!-- Mở khóa -->
+<div id="screen-lock" class="screen">
+  <div class="panel">
+    <h1>Daily Scrum</h1>
+    <p class="muted">Dữ liệu đang được khóa. Nhập mật khẩu để mở.</p>
+    <label for="unlockPass">Mật khẩu</label>
+    <input id="unlockPass" type="password" autocomplete="current-password">
+    <button data-action="unlock">Mở khóa</button>
+    <p id="lockMsg" class="msg"></p>
+    <p class="muted small">Quên mật khẩu? Chỉ có thể xóa dữ liệu trên máy và bắt đầu lại.
+      <a href="#" data-action="wipe-local">Xóa dữ liệu trên máy này</a></p>
+  </div>
+</div>
+
+<!-- Kết nối AI: chỉ hiện khi chưa kết nối xong, hoặc khi người dùng chủ động đổi -->
+<div id="screen-onboard" class="screen">
+  <div class="panel wide">
+    <h1>Kết nối AI (chỉ cần làm 1 lần)</h1>
+    <p class="muted">Chọn AI của bạn cho 2 bước và kiểm tra kết nối. Key được mã hóa và chỉ gửi tới đúng nhà cung cấp đó.</p>
+    <label for="sttSel">Bước 1 — Chuyển giọng nói thành chữ</label>
+    <select id="sttSel" data-change="pick-ai"></select>
+    <p id="sttNote" class="warn"></p>
+    <label for="llmSel">Bước 2 — Phân tích daily</label>
+    <select id="llmSel" data-change="pick-ai"></select>
+    <div id="guides"></div>
+    <details>
+      <summary class="muted">Tuỳ chọn model</summary>
+      <label for="sttModel">Model chuyển giọng nói</label><input id="sttModel">
+      <label for="llmModel">Model phân tích</label><input id="llmModel">
+    </details>
+    <button id="doneBtn" data-action="finish-onboard" disabled>Hoàn tất, bắt đầu dùng</button>
+    <button id="cancelOnboard" class="ghost" data-action="cancel-onboard">Quay lại</button>
+  </div>
+</div>
+
+<!-- Màn hình chính -->
+<div id="screen-main" class="screen">
+  <header>
+    <strong>Daily Scrum</strong>
+    <span id="syncStatus" class="muted small"></span>
+    <span class="spacer"></span>
+    <button class="ghost sm" data-action="sync-now">Đồng bộ</button>
+    <button class="ghost sm" data-action="lock">Khóa</button>
+  </header>
+  <nav>
+    <button data-view="overview">Hôm nay</button>
+    <button data-view="analyze">Phân tích</button>
+    <button data-view="history">Lịch sử</button>
+    <button data-view="teams">Team</button>
+    <button data-view="settings">Cài đặt</button>
+  </nav>
+  <main>
+    <section id="view-overview" class="view"></section>
+    <section id="view-analyze" class="view">
+      <label for="teamSel">Team</label>
+      <select id="teamSel"></select>
+      <label for="audio">File ghi âm (không được lưu lại sau khi phân tích)</label>
+      <input id="audio" type="file" accept="audio/*">
+      <button id="goBtn" data-action="analyze">Phân tích</button>
+      <p id="analyzeMsg" class="msg"></p>
+      <div id="analyzeReport"></div>
+    </section>
+    <section id="view-history" class="view"></section>
+    <section id="view-teams" class="view"></section>
+    <section id="view-settings" class="view"></section>
+    <section id="view-report" class="view"></section>
+  </main>
+</div>
+
+<!-- Quyền riêng tư -->
+<div id="screen-privacy" class="screen">
+  <div class="panel wide">
+    <h1>Dữ liệu của bạn được xử lý thế nào</h1>
+    <ul>
+      <li><b>File ghi âm</b> được gửi thẳng từ trình duyệt tới AI chuyển giọng nói bạn chọn (ChatGPT hoặc Gemini), rồi bỏ đi. App không lưu file ghi âm.</li>
+      <li><b>Transcript, report, danh sách team, API key</b> được mã hóa bằng mật khẩu của bạn (AES-256-GCM) và lưu trong trình duyệt trên máy này.</li>
+      <li><b>Đồng bộ</b> (nếu bật): bản đã mã hóa được lưu trong thư mục ẩn dành riêng cho app trong Google Drive của bạn. App chỉ có quyền với thư mục đó, không thấy file nào khác trong Drive. Google không đọc được nội dung vì nó đã được mã hóa.</li>
+      <li><b>Người làm ra app không nhận bất kỳ dữ liệu nào.</b> Trang này bị trình duyệt chặn gửi dữ liệu tới mọi địa chỉ ngoài API của OpenAI, Google Gemini, Anthropic và Google Drive.</li>
+      <li><b>Nhà cung cấp AI</b> xử lý nội dung bạn gửi theo điều khoản của họ. API trả phí của OpenAI và Anthropic mặc định không dùng dữ liệu để huấn luyện; với Gemini gói miễn phí, Google có thể dùng dữ liệu để cải thiện sản phẩm, nên dùng gói trả phí cho dữ liệu công việc.</li>
+      <li>Hãy xin đồng ý của các thành viên trước khi ghi âm daily.</li>
+    </ul>
+    <button data-action="close-privacy">Đã hiểu</button>
+  </div>
+</div>
+
+</body>
+</html>
