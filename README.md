@@ -60,7 +60,12 @@ Nên đặt **link mở app**, không nên nhúng iframe. Trên Safari (iPad, iP
 ## Người dùng sử dụng thế nào
 
 1. Mở link app, đặt mật khẩu bảo vệ dữ liệu.
-2. Màn hình **Kết nối AI** chỉ hiện lần đầu: chọn ChatGPT hoặc Gemini cho bước chuyển giọng nói, và ChatGPT, Gemini hoặc Claude cho bước phân tích; làm theo hướng dẫn hiện ra để lấy key; bấm **Lưu và kiểm tra kết nối**; bấm **Hoàn tất**.
+2. Màn hình **Kết nối AI** chỉ hiện lần đầu:
+   - Chọn gói AI đang trả tiền (ChatGPT Pro/Business, Claude Max/Team, Google AI Pro/Ultra, ChatGPT Plus/Claude Pro/miễn phí, hoặc đã có tài khoản API). App tự gợi ý AI cho 2 việc: chép lời (ChatGPT hoặc Gemini) và phân tích (ChatGPT, Gemini hoặc Claude).
+   - Mỗi thẻ kết nối có nút chọn gói, hiện đúng các bước lấy key cho gói đó: nhận credit API hằng tháng (ChatGPT Pro/Business, Claude Max/Team), nạp tiền API riêng (Plus, Pro, miễn phí), hoặc bật thanh toán Google Cloud (gói Google AI không bao gồm Gemini API).
+   - Dán key, bấm **Lưu và kiểm tra kết nối**, rồi bấm **Tiếp tục**.
+
+   Lưu ý: gói chat và API là hai thứ tính tiền riêng. Credit API kèm gói Pro/Max/Team cần gói đã dùng đủ 7 ngày và hết hạn theo từng chu kỳ thanh toán.
 3. Thêm team ở thẻ **Team**.
 4. Thẻ **Phân tích**: chọn team, chọn file ghi âm, bấm **Phân tích**.
 5. Thẻ **Hôm nay**: tổng hợp các team, impediment đang mở, thành viên thiếu nội dung 3 daily liên tiếp.
