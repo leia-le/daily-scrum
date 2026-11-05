@@ -6,6 +6,7 @@ App phân tích buổi Daily Scrum từ file ghi âm. Chạy hoàn toàn trên t
 - Key và dữ liệu được mã hóa AES-256-GCM bằng mật khẩu người dùng tự đặt.
 - Đồng bộ giữa các thiết bị qua thư mục ẩn của app trong Google Drive của chính người dùng (tùy chọn).
 - Trình duyệt bị khóa cứng, chỉ được gửi dữ liệu tới API của OpenAI, Google Gemini, Anthropic và Google Drive.
+- Khi nhập team từ file .xlsx, app nạp thư viện SheetJS 0.18.5 (giấy phép Apache 2.0) từ jsDelivr, khóa bằng mã toàn vẹn SRI. Nội dung file không gửi đi đâu; file được đọc ngay trên máy.
 
 ## Bộ file
 

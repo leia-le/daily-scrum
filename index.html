@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<!-- Chính sách bảo mật: chỉ cho tải mã từ chính trang này và Google Sign-In,
+<!-- Chính sách bảo mật: chỉ cho tải mã từ chính trang này, Google Sign-In và đúng 1 file thư viện đọc Excel (khóa SRI),
      chỉ cho gửi dữ liệu tới 3 API AI và Google Drive. Mọi địa chỉ khác bị trình duyệt chặn. -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  script-src 'self' https://accounts.google.com/gsi/client;
+  script-src 'self' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js;
   style-src 'self' https://accounts.google.com/gsi/style;
   connect-src https://api.openai.com https://generativelanguage.googleapis.com https://api.anthropic.com https://www.googleapis.com https://accounts.google.com/gsi/;
   frame-src https://accounts.google.com/gsi/;

@@ -667,6 +667,8 @@ function renderHelp() {
         <ul class="tight"><li>Thống nhất với team: mỗi người tự xưng tên khi đến lượt.</li>
           <li>Trong thẻ Team, ghi tên thành viên đúng cách gọi thật; có thể thêm tên gọi khác trong ngoặc, ví dụ "Nam (anh Nam, Nam BE)".</li>
           <li>Ghi âm gần người nói, tránh phòng ồn.</li></ul></details>
+      <details><summary>Có nhiều team, nhập từng cái mất thời gian?</summary>
+        <p>Vào thẻ Team → "Nhập từ file Excel/CSV". Tải file mẫu, điền mỗi dòng một team, rồi chọn file (.xlsx hoặc .csv), hoặc dán thẳng vùng dữ liệu từ Excel/Google Sheets. App cho xem trước, báo lỗi từng dòng trước khi nhập. Team trùng tên sẽ được cập nhật, nên khi sang sprint mới bạn có thể tải danh sách team về, sửa ngày và Sprint Goal, rồi nhập lại.</p></details>
       <details><summary>Dùng trên điện thoại hoặc máy khác thế nào?</summary>
         <p>Cài đặt → Đồng bộ: bật đồng bộ Google Drive. Trên máy kia mở app, chọn "Tôi đã dùng app trên thiết bị khác", nhập đúng mật khẩu. Hoặc dùng file sao lưu.</p></details>
       <details><summary>File ghi âm có bị lưu lại không?</summary>
@@ -691,17 +693,24 @@ let editingTeam = null;
 function renderTeams() {
   const teams = teamsSorted(), t = editingTeam ? S().teams[editingTeam] : null;
   const intro = !teams.length ? `${stepperHtml(3)}
-    <div class="callout"><b>Thêm team bạn muốn theo dõi.</b> App dùng danh sách thành viên để biết ai đang nói, và dùng Sprint Goal để đánh giá team có đi đúng hướng không. Bạn có thể thêm nhiều team, sửa lại bất cứ lúc nào.</div>` : '';
+    <div class="callout"><b>Thêm team bạn muốn theo dõi.</b> App dùng danh sách thành viên để biết ai đang nói, và dùng Sprint Goal để đánh giá team có đi đúng hướng không. Bạn có thể nhập từng team, hoặc nhập nhiều team một lúc từ file Excel/CSV.</div>` : '';
+  const mode = t ? 'manual' : teamMode;
   $('#view-teams').innerHTML = `
     ${intro}
     <h2>Team của bạn</h2>
+    ${teams.length ? `<p class="muted small">Bạn có thể tải danh sách team về file Excel/CSV để sửa hàng loạt (ví dụ khi sang sprint mới), rồi nhập lại. Team trùng tên sẽ được cập nhật.
+      <a href="#" data-action="export-teams">Tải danh sách team (.csv)</a></p>` : ''}
     ${teams.length ? teams.map(x => `<div class="list-item"><div><b>${esc(x.name)}</b> · ${esc(x.project)}
         <div class="muted small">${esc(x.members.join(', '))}</div>
         <div class="muted small">Sprint ${esc(x.sprintStart || '?')} → ${esc(x.sprintEnd || '?')} · ${esc(x.sprintGoal)}</div></div>
         <span><button class="ghost sm" data-action="edit-team" data-id="${x.id}">Sửa</button>
         <button class="danger sm" data-action="delete-team" data-id="${x.id}">Xóa</button></span></div>`).join('')
-      : '<p class="muted">Chưa có team nào. Điền form bên dưới để thêm team đầu tiên.</p>'}
-    <div class="card">
+      : '<p class="muted">Chưa có team nào. Chọn một cách thêm team bên dưới.</p>'}
+    ${t ? '' : `<div class="seg" role="tablist" aria-label="Cách thêm team">
+      <button role="tab" class="${mode === 'manual' ? 'on' : ''}" aria-selected="${mode === 'manual'}" data-action="team-mode" data-mode="manual">Thêm thủ công</button>
+      <button role="tab" class="${mode === 'import' ? 'on' : ''}" aria-selected="${mode === 'import'}" data-action="team-mode" data-mode="import">Nhập từ file Excel/CSV</button>
+    </div>`}
+    ${mode === 'import' ? importCardHtml() : `<div class="card">
       <h4>${t ? 'Sửa team' : 'Thêm team'}</h4>
       <label for="tName">Tên team <span class="muted">· bắt buộc</span></label>
       <input id="tName" placeholder="Ví dụ: Invoice A" value="${esc(t?.name || '')}">
@@ -720,7 +729,198 @@ function renderTeams() {
       <button data-action="save-team">${t ? 'Lưu thay đổi' : 'Thêm team'}</button>
       ${t ? '<button class="ghost" data-action="cancel-team">Hủy</button>' : ''}
       <p class="msg" id="teamMsg"></p>
-    </div>`;
+    </div>`}`;
+  if (mode === 'import' && importPreview) renderImportPreview();
+}
+
+/* ---------- Nhập team từ file ---------- */
+let teamMode = 'manual', importPreview = null;
+const TEAM_COLUMNS = [
+  { key: 'name', label: 'Team', aliases: ['team', 'ten team', 'tên team', 'team name', 'nhom', 'nhóm'] },
+  { key: 'project', label: 'Project', aliases: ['project', 'du an', 'dự án', 'san pham', 'sản phẩm'] },
+  { key: 'members', label: 'Thành viên', aliases: ['thanh vien', 'thành viên', 'members', 'member', 'nhan su', 'nhân sự'] },
+  { key: 'sprintStart', label: 'Bắt đầu sprint', aliases: ['bat dau sprint', 'bắt đầu sprint', 'bat dau', 'bắt đầu', 'sprint start', 'start', 'start date', 'ngay bat dau', 'ngày bắt đầu'] },
+  { key: 'sprintEnd', label: 'Kết thúc sprint', aliases: ['ket thuc sprint', 'kết thúc sprint', 'ket thuc', 'kết thúc', 'sprint end', 'end', 'end date', 'ngay ket thuc', 'ngày kết thúc'] },
+  { key: 'sprintGoal', label: 'Sprint Goal', aliases: ['sprint goal', 'goal', 'muc tieu', 'mục tiêu', 'muc tieu sprint', 'mục tiêu sprint'] }
+];
+const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+
+// Tách danh sách thành viên theo dấu phẩy, chấm phẩy hoặc xuống dòng, KHÔNG tách bên trong ngoặc: "Nam (anh Nam, Nam BE), Lan"
+function splitMembers(text) {
+  const out = []; let cur = '', depth = 0;
+  for (const ch of String(text ?? '')) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (!depth && (ch === ',' || ch === ';' || ch === '\n')) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(s => s.trim()).filter(Boolean);
+}
+
+// Ngày: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, số ngày kiểu Excel, hoặc đối tượng Date
+function parseDate(v) {
+  if (v == null || v === '') return { value: '' };
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = (y, m, d) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? { value: `${y}-${pad(m)}-${pad(d)}` } : { error: true };
+  };
+  if (v instanceof Date && !isNaN(v)) return ymd(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  if (typeof v === 'number' && v > 20000 && v < 80000) { // số ngày của Excel
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 864e5);
+    return ymd(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) return ymd(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (m) return ymd(+m[3], +m[2], +m[1]); // định dạng Việt Nam: ngày/tháng/năm
+  return { error: true };
+}
+
+// Đọc CSV/TSV (có dấu ngoặc kép, xuống dòng trong ô); tự nhận dấu phân cách
+function parseDelimited(text) {
+  text = text.replace(/^﻿/, '');
+  const firstLine = text.split(/\r?\n/)[0] || '';
+  const delim = ['\t', ';', ','].map(d => [d, firstLine.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"' && cell === '') q = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(x => String(x).trim() !== ''));
+}
+
+let xlsxLoading = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  return xlsxLoading || (xlsxLoading = new Promise((res, rej) => {
+    // SheetJS 0.18.5 (Apache 2.0) từ jsDelivr, khóa bằng SRI: file bị sửa dù 1 byte thì trình duyệt từ chối chạy
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js';
+    s.integrity = 'sha384-6fBkVFQw1YKyYpZpKf7bguegzeJqso45fTePEWGNuVaGy70fxEhICA/yswrPjW4+';
+    s.crossOrigin = 'anonymous';
+    s.referrerPolicy = 'no-referrer';
+    s.onload = () => res();
+    s.onerror = () => { xlsxLoading = null; rej(new Error('Không tải được bộ đọc Excel. Kiểm tra mạng, hoặc lưu file dạng CSV rồi nhập lại.')); };
+    document.head.appendChild(s);
+  }));
+}
+
+async function readTeamFile(file) {
+  const name = file.name.toLowerCase();
+  if (file.size > 2 * 1024 * 1024) throw new Error('File lớn hơn 2 MB. Danh sách team thường chỉ vài KB, hãy kiểm tra lại file.');
+  if (/\.(xlsx|xlsm|xlsb|ods)$/.test(name)) {
+    await loadXlsx();
+    // cellDates: false → ô ngày giữ dạng số ngày của Excel; parseDate tự đổi theo UTC nên không bị lệch múi giờ
+    const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }).filter(r => r.some(x => String(x).trim() !== ''));
+  }
+  if (/\.xls$/.test(name)) throw new Error('File .xls (Excel đời cũ) chưa được hỗ trợ. Trong Excel chọn Lưu thành → .xlsx hoặc .csv rồi nhập lại.');
+  return parseDelimited(await file.text());
+}
+
+// Đối chiếu tiêu đề cột, kiểm tra từng dòng, xác định team mới hay cập nhật
+function buildImportPreview(rows) {
+  if (rows.length < 2) throw new Error('File cần có dòng tiêu đề và ít nhất 1 dòng team.');
+  const header = rows[0].map(fold);
+  const colIdx = {};
+  TEAM_COLUMNS.forEach(c => { const i = header.findIndex(h => c.aliases.map(fold).includes(h)); if (i >= 0) colIdx[c.key] = i; });
+  const missing = ['name', 'members'].filter(k => colIdx[k] == null).map(k => TEAM_COLUMNS.find(c => c.key === k).label);
+  if (missing.length) throw new Error(`Không tìm thấy cột bắt buộc: ${missing.join(', ')}. Hãy dùng file mẫu, hoặc đặt tên cột đúng như file mẫu.`);
+  const existing = {}; teamsSorted().forEach(t => { existing[fold(t.name)] = t; });
+  const seen = {};
+  const items = rows.slice(1).map((r, i) => {
+    const get = k => colIdx[k] == null ? '' : r[colIdx[k]];
+    const errors = [], warnings = [];
+    const name = String(get('name') ?? '').trim();
+    const members = splitMembers(get('members'));
+    const start = parseDate(get('sprintStart')), end = parseDate(get('sprintEnd'));
+    if (!name) errors.push('thiếu tên team');
+    if (!members.length) errors.push('thiếu thành viên');
+    if (start.error) errors.push('ngày bắt đầu không đọc được (dùng dạng 2026-11-03 hoặc 03/11/2026)');
+    if (end.error) errors.push('ngày kết thúc không đọc được');
+    if (start.value && end.value && start.value > end.value) errors.push('ngày bắt đầu sau ngày kết thúc');
+    if (name && seen[fold(name)]) errors.push(`trùng tên với dòng ${seen[fold(name)]}`);
+    if (name) seen[fold(name)] = i + 2;
+    const goal = String(get('sprintGoal') ?? '').trim();
+    if (!goal && !errors.length) warnings.push('chưa có Sprint Goal');
+    const match = name ? existing[fold(name)] : null;
+    return { line: i + 2, name, project: String(get('project') ?? '').trim(), members,
+      sprintStart: start.value || '', sprintEnd: end.value || '', sprintGoal: goal,
+      errors, warnings, existingId: match ? match.id : null };
+  });
+  return { items, columns: Object.keys(colIdx) };
+}
+
+function importCardHtml() {
+  return `<div class="card">
+    <h4>Nhập nhiều team từ file</h4>
+    <ol class="tight">
+      <li>Tải file mẫu, mở bằng Excel, Google Sheets hoặc Numbers.</li>
+      <li>Mỗi dòng là một team. Cột <b>Team</b> và <b>Thành viên</b> bắt buộc; thành viên cách nhau dấu phẩy, tên gọi khác để trong ngoặc.</li>
+      <li>Ngày ghi dạng <code>2026-11-03</code> hoặc <code>03/11/2026</code> (ngày/tháng/năm).</li>
+      <li>Lưu file (.xlsx hoặc .csv) rồi chọn file bên dưới. Bạn sẽ được xem trước trước khi nhập.</li>
+    </ol>
+    <div class="row">
+      <button class="ghost" data-action="template-csv">Tải file mẫu (.csv)</button>
+    </div>
+    <label for="teamFile">Chọn file (.xlsx, .csv)</label>
+    <input id="teamFile" type="file" accept=".xlsx,.xlsm,.ods,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <details>
+      <summary class="muted small">Hoặc dán trực tiếp từ Excel/Google Sheets</summary>
+      <p class="muted small">Chọn vùng có cả dòng tiêu đề trong bảng tính, sao chép (Ctrl/Cmd+C) rồi dán vào đây.</p>
+      <textarea id="teamPaste" rows="5" placeholder="Team	Project	Thành viên	Bắt đầu sprint	Kết thúc sprint	Sprint Goal"></textarea>
+      <button class="ghost" data-action="preview-paste">Xem trước dữ liệu đã dán</button>
+    </details>
+    <p class="msg" id="importMsg"></p>
+    <div id="importPreview"></div>
+  </div>`;
+}
+
+function renderImportPreview() {
+  const box = $('#importPreview');
+  if (!box || !importPreview) return;
+  const it = importPreview.items;
+  const ok = it.filter(x => !x.errors.length), bad = it.filter(x => x.errors.length);
+  const nNew = ok.filter(x => !x.existingId).length, nUpd = ok.filter(x => x.existingId).length;
+  box.innerHTML = `<h4>Xem trước · ${it.length} dòng</h4>
+    <p class="small">${nNew ? `<span class="badge good">${nNew} team mới</span> ` : ''}${nUpd ? `<span class="badge warn">${nUpd} team sẽ được cập nhật</span> ` : ''}${bad.length ? `<span class="badge bad">${bad.length} dòng lỗi, sẽ bỏ qua</span>` : ''}</p>
+    ${nUpd ? '<p class="muted small">Team trùng tên với team đã có sẽ được ghi đè bằng thông tin trong file. Lịch sử report của team vẫn giữ nguyên.</p>' : ''}
+    <div class="table-wrap"><table>
+      <tr><th>Dòng</th><th>Team</th><th>Thành viên</th><th>Sprint</th><th>Sprint Goal</th><th>Kết quả</th></tr>
+      ${it.map(x => `<tr>
+        <td>${x.line}</td><td><b>${esc(x.name || '—')}</b>${x.project ? `<div class="muted small">${esc(x.project)}</div>` : ''}</td>
+        <td>${esc(x.members.join(', ') || '—')}<div class="muted small">${x.members.length} người</div></td>
+        <td class="small">${esc(x.sprintStart || '?')} → ${esc(x.sprintEnd || '?')}</td>
+        <td class="small">${esc(x.sprintGoal || '—')}</td>
+        <td class="small">${x.errors.length ? `<span class="badge bad">Lỗi</span> ${esc(x.errors.join('; '))}`
+          : `<span class="badge ${x.existingId ? 'warn' : 'good'}">${x.existingId ? 'Cập nhật' : 'Mới'}</span>${x.warnings.length ? ` <span class="muted">${esc(x.warnings.join('; '))}</span>` : ''}`}</td>
+      </tr>`).join('')}
+    </table></div>
+    ${ok.length ? `<button data-action="confirm-import">Nhập ${ok.length} team</button>` : '<p class="msg err">Không có dòng hợp lệ để nhập. Sửa file rồi chọn lại.</p>'}
+    <button class="ghost" data-action="cancel-import">Hủy</button>`;
+}
+
+function csvCell(v) {
+  const s = String(v ?? '');
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function teamsCsv(teams) {
+  const header = TEAM_COLUMNS.map(c => c.label);
+  const lines = [header, ...teams.map(t => [t.name, t.project, t.members.join(', '), t.sprintStart, t.sprintEnd, t.sprintGoal])];
+  return '﻿' + lines.map(r => r.map(csvCell).join(',')).join('\r\n'); // BOM để Excel đọc đúng tiếng Việt
 }
 
 function renderSettings() {
@@ -937,11 +1137,47 @@ const actions = {
     await persist(); renderOverview();
   },
 
-  'edit-team'(el) { editingTeam = el.dataset.id; renderTeams(); },
+  'team-mode'(el) { teamMode = el.dataset.mode; importPreview = null; renderTeams(); },
+  'template-csv'() {
+    const sample = [
+      { name: 'Invoice A', project: 'Sapo Invoice', members: ['Nam (anh Nam, Nam BE)', 'Lan', 'Hùng'], sprintStart: '2026-11-03', sprintEnd: '2026-11-14', sprintGoal: 'Ra mắt thanh toán QR cho merchant thử nghiệm' },
+      { name: 'Accounting B', project: 'Sapo Accounting', members: ['Minh', 'Thảo', 'Quân'], sprintStart: '2026-11-03', sprintEnd: '2026-11-14', sprintGoal: 'Hoàn thiện báo cáo công nợ' }
+    ];
+    download('daily-scrum-mau-team.csv', teamsCsv(sample), 'text/csv;charset=utf-8');
+  },
+  'export-teams'() { download(`daily-scrum-team-${todayStr()}.csv`, teamsCsv(teamsSorted()), 'text/csv;charset=utf-8'); },
+  'preview-paste'() {
+    try {
+      const text = $('#teamPaste').value;
+      if (!text.trim()) return setMsg('#importMsg', 'Chưa có dữ liệu để xem trước.', 'err');
+      importPreview = buildImportPreview(parseDelimited(text));
+      setMsg('#importMsg', ''); renderImportPreview();
+    } catch (e) { importPreview = null; $('#importPreview').innerHTML = ''; setMsg('#importMsg', e.message, 'err'); }
+  },
+  'cancel-import'() { importPreview = null; renderTeams(); },
+  async 'confirm-import'(btn) {
+    const ok = importPreview.items.filter(x => !x.errors.length);
+    busy(btn, true, 'Đang nhập...');
+    const wasEmpty = !teamsSorted().length;
+    let firstId = null;
+    ok.forEach(x => {
+      const id = x.existingId || uid();
+      firstId = firstId || id;
+      S().teams[id] = { id, name: x.name, project: x.project, members: x.members, sprintStart: x.sprintStart,
+        sprintEnd: x.sprintEnd, sprintGoal: x.sprintGoal, updatedAt: now() };
+    });
+    await persist();
+    const nNew = ok.filter(x => !x.existingId).length, nUpd = ok.length - nNew;
+    importPreview = null; teamMode = 'manual';
+    if (wasEmpty && !live('dailies').length) { showView('analyze'); if (firstId) $('#teamSel').value = firstId; return; }
+    renderTeams();
+    setMsg('#teamMsg', `Đã nhập ${nNew} team mới${nUpd ? `, cập nhật ${nUpd} team` : ''}.`, 'ok');
+  },
+  'edit-team'(el) { editingTeam = el.dataset.id; teamMode = 'manual'; renderTeams(); },
   'cancel-team'() { editingTeam = null; renderTeams(); },
   async 'save-team'() {
     const name = $('#tName').value.trim();
-    const members = $('#tMembers').value.split(',').map(s => s.trim()).filter(Boolean);
+    const members = splitMembers($('#tMembers').value);
     if (!name) return setMsg('#teamMsg', 'Nhập tên team.', 'err');
     if (!members.length) return setMsg('#teamMsg', 'Nhập ít nhất 1 thành viên.', 'err');
     const id = editingTeam || uid();
@@ -1003,7 +1239,18 @@ document.addEventListener('click', e => {
   const fn = actions[el.dataset.action];
   if (fn) Promise.resolve(fn(el, e)).catch(err => alert(err.message));
 });
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
+  if (e.target.id === 'teamFile') {
+    const f = e.target.files[0];
+    if (!f) return;
+    setMsg('#importMsg', 'Đang đọc file ' + f.name + '...');
+    try {
+      importPreview = buildImportPreview(await readTeamFile(f));
+      setMsg('#importMsg', ''); renderImportPreview();
+    } catch (err) { importPreview = null; $('#importPreview').innerHTML = ''; setMsg('#importMsg', err.message, 'err'); }
+    e.target.value = '';
+    return;
+  }
   if (e.target.dataset.change === 'show-pass') {
     e.target.dataset.target.split(',').forEach(id => { $('#' + id).type = e.target.checked ? 'text' : 'password'; });
     return;

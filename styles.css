@@ -99,3 +99,9 @@ details.card summary { cursor: pointer; }
 .faq details { border-bottom: 1px solid var(--line); padding: 10px 0; }
 .faq summary { cursor: pointer; font-weight: 600; }
 .faq p, .faq ul { color: var(--muted); font-size: 15px; }
+
+/* ---- Chọn cách thêm team ---- */
+.seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 3px; margin: 16px 0 4px; background: var(--soft); }
+.seg button { flex: 1; margin: 0; background: transparent; color: var(--muted); border: none; font-weight: 600; padding: 9px 8px; }
+.seg button.on { background: var(--bg); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+#importPreview table td { font-size: 13px; }
