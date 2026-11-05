@@ -423,8 +423,14 @@ function setSync(text, kind) {
 }
 
 /* ---------- Giao diện chung ---------- */
+const STEPS = ['Đặt mật khẩu', 'Kết nối AI', 'Thêm team', 'Phân tích'];
+function stepperHtml(cur) {
+  return `<ol class="stepper" aria-label="Bước ${cur} trên ${STEPS.length}">${STEPS.map((s, i) =>
+    `<li class="${i + 1 < cur ? 'done' : i + 1 === cur ? 'cur' : ''}"><span>${i + 1 < cur ? '✓' : i + 1}</span>${s}</li>`).join('')}</ol>`;
+}
 function showScreen(name) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === 'screen-' + name));
+  $$('[data-stepper]').forEach(el => { el.innerHTML = stepperHtml(Number(el.dataset.stepper)); });
   window.scrollTo(0, 0);
 }
 function setMsg(sel, text, kind) {
@@ -442,13 +448,14 @@ function showView(name) {
 function refreshCurrentView() {
   if (!session || !$('#screen-main').classList.contains('on')) return;
   ({ overview: renderOverview, analyze: renderAnalyze, history: renderHistory, teams: renderTeams,
-     settings: renderSettings, report: () => {} })[currentView]?.();
+     settings: renderSettings, help: renderHelp, report: () => {} })[currentView]?.();
 }
 function enterApp() {
   if (!aiReady()) return openOnboard();
   showScreen('main');
   setSync();
-  if (!teamsSorted().length) { showView('teams'); return; }
+  if (!teamsSorted().length) { showView('teams'); return; }          // bước 3
+  if (!live('dailies').length) { showView('analyze'); return; }      // bước 4
   showView('overview');
 }
 
@@ -460,7 +467,11 @@ function openOnboard() {
   $('#sttSel').value = st.stt; $('#llmSel').value = st.llm;
   $('#sttModel').value = st.sttModel || AI[st.stt].sttModel || '';
   $('#llmModel').value = st.llmModel || AI[st.llm].llmModel || '';
-  $('#cancelOnboard').style.display = aiReady() ? '' : 'none';
+  const changing = aiReady(); // đã kết nối trước đó, đang vào từ Cài đặt để đổi
+  $('#cancelOnboard').style.display = changing ? '' : 'none';
+  $('#onboardStepper').dataset.stepper = '2';
+  $('#onboardStepper').style.display = changing ? 'none' : '';
+  $('#doneBtn').textContent = changing ? 'Lưu thay đổi' : 'Tiếp tục: thêm team';
   showScreen('onboard');
   renderGuides();
 }
@@ -485,7 +496,12 @@ function renderGuides() {
 }
 function updateDone() {
   const st = setting(), stt = $('#sttSel').value, llm = $('#llmSel').value;
-  $('#doneBtn').disabled = !(AI[stt].canTranscribe && st.connected[stt] && st.connected[llm]);
+  const ok = AI[stt].canTranscribe && st.connected[stt] && st.connected[llm];
+  $('#doneBtn').disabled = !ok;
+  const waiting = [...new Set([stt, llm])].filter(k => AI[k].canTranscribe !== false || k === llm).filter(k => !st.connected[k]);
+  $('#doneHint').textContent = !AI[stt].canTranscribe ? 'Hãy chọn ChatGPT hoặc Gemini cho việc chuyển giọng nói.'
+    : ok ? 'Đã kết nối xong. Bấm nút bên dưới để tiếp tục.'
+    : 'Còn chờ kết nối: ' + waiting.map(k => AI[k].label).join(', ') + '.';
 }
 function collectOnboard() {
   const st = setting();
@@ -566,17 +582,22 @@ function renderOverview() {
     .filter(x => impStatus(x.id) === 'Mở');
   const flags = repeatedIncomplete();
   $('#view-overview').innerHTML = `
+    ${checklistHtml()}
     <h2>Hôm nay · ${esc(today)}</h2>
+    <p class="muted small">Tổng hợp các buổi daily đã phân tích hôm nay. Bấm "Xem" để mở report chi tiết.</p>
     ${todays.length ? `<div class="table-wrap"><table><tr><th>Team</th><th>Sprint Goal</th><th>Lý do</th><th>Impediment</th><th></th></tr>
       ${todays.map(d => `<tr><td>${esc(d.teamName)}</td><td>${goalBadge(d.result.sprint_goal.status)}</td><td>${esc(d.result.sprint_goal.reason)}</td>
         <td>${d.result.impediments.length}</td><td><a href="#" data-action="open-report" data-id="${d.id}">Xem</a></td></tr>`).join('')}
-      </table></div>` : '<p class="muted">Hôm nay chưa phân tích buổi daily nào. Vào thẻ Phân tích để bắt đầu.</p>'}
+      </table></div>` : `<div class="empty"><p class="muted">Hôm nay chưa phân tích buổi daily nào.</p>
+        <button data-action="goto" data-view="analyze">Phân tích buổi daily</button></div>`}
     <h2>Impediment đang mở (${openImps.length})</h2>
+    <p class="muted small">Vướng mắc cần bạn hoặc người ngoài team gỡ. Bấm "Đã xử lý" khi đã gỡ xong.</p>
     ${openImps.length ? openImps.map(x => `<div class="list-item"><div><b>${esc(x.d.teamName)}</b> · ${esc(x.d.date)} · ${esc(x.i.raised_by)}: ${esc(x.i.description)}
       <div class="muted small">Cần: ${esc(x.i.needs)}</div></div>
       <button class="ghost sm" data-action="close-imp" data-id="${esc(x.id)}">Đã xử lý</button></div>`).join('')
       : '<p class="muted">Không có impediment nào đang mở.</p>'}
     <h2>Cần trao đổi với Scrum Master</h2>
+    <p class="muted small">Thành viên 3 buổi daily liên tiếp chưa trả lời đủ 3 câu hỏi.</p>
     ${flags.length ? '<ul>' + flags.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>' : '<p class="muted">Không có thành viên nào thiếu nội dung 3 daily liên tiếp.</p>'}`;
 }
 
@@ -586,15 +607,76 @@ function renderAnalyze() {
   sel.innerHTML = teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
   if (teams.some(t => t.id === prev)) sel.value = prev;
   $('#goBtn').disabled = !teams.length;
-  if (!teams.length) setMsg('#analyzeMsg', 'Chưa có team. Vào thẻ Team để thêm.', 'err');
+  $('#analyzeIntro').innerHTML = !teams.length
+    ? `<div class="empty"><p>Bạn cần thêm ít nhất 1 team trước khi phân tích.</p><button data-action="goto" data-view="teams">Thêm team</button></div>`
+    : !live('dailies').length
+      ? `${stepperHtml(4)}<div class="callout"><b>Bước cuối:</b> phân tích buổi daily đầu tiên. Chưa có file thật? Bạn có thể tự ghi âm 1 phút giả làm 2–3 thành viên báo cáo để thử.</div>`
+      : '';
 }
 
 function renderHistory() {
   const items = dailiesSorted();
-  $('#view-history').innerHTML = `<h2>Lịch sử (${items.length})</h2>` + (items.length
+  $('#view-history').innerHTML = `<h2>Lịch sử (${items.length})</h2>
+    <p class="muted small">Tất cả report đã phân tích, mới nhất ở trên. Bấm vào một dòng để xem report, transcript và sao chép gửi đi.</p>` + (items.length
     ? items.map(d => `<div class="list-item"><a href="#" data-action="open-report" data-id="${d.id}">${esc(d.date)} · <b>${esc(d.teamName)}</b></a>
         <span>${goalBadge(d.result.sprint_goal.status)} <button class="danger sm" data-action="delete-daily" data-id="${d.id}">Xóa</button></span></div>`).join('')
-    : '<p class="muted">Chưa có report nào.</p>');
+    : `<div class="empty"><p class="muted">Chưa có report nào.</p><button data-action="goto" data-view="analyze">Phân tích buổi daily đầu tiên</button></div>`);
+}
+
+// Danh sách việc cần làm khi mới dùng; ẩn khi đã xong hoặc người dùng tắt
+function checklistHtml() {
+  const st = setting();
+  if (st.hideChecklist) return '';
+  const items = [
+    { done: aiReady(), text: 'Kết nối AI', view: null, action: 'open-onboard', btn: 'Kết nối' },
+    { done: teamsSorted().length > 0, text: 'Thêm team đầu tiên', view: 'teams', btn: 'Thêm team' },
+    { done: live('dailies').length > 0, text: 'Phân tích buổi daily đầu tiên', view: 'analyze', btn: 'Phân tích' },
+    ...(CFG.GOOGLE_CLIENT_ID ? [{ done: !!st.syncEnabled, text: 'Bật đồng bộ Google Drive để dùng trên nhiều thiết bị (không bắt buộc)', view: 'settings', btn: 'Cài đặt' }] : []),
+    { done: !!st.backedUp, text: 'Tải file sao lưu, phòng khi trình duyệt bị xóa dữ liệu', view: 'settings', btn: 'Sao lưu' }
+  ];
+  const left = items.filter(i => !i.done).length;
+  if (!left) return '';
+  return `<div class="card"><h4>Bắt đầu với Daily Scrum · còn ${left} việc</h4>
+    <ul class="checklist">${items.map(i => `<li class="${i.done ? 'done' : ''}"><span class="tick">${i.done ? '✓' : ''}</span>
+      <span class="txt">${esc(i.text)}</span>
+      ${i.done ? '' : i.action ? `<button class="ghost sm" data-action="${i.action}">${i.btn}</button>`
+        : `<button class="ghost sm" data-action="goto" data-view="${i.view}">${i.btn}</button>`}</li>`).join('')}</ul>
+    <p class="small"><a href="#" data-action="hide-checklist">Ẩn danh sách này</a></p></div>`;
+}
+
+function renderHelp() {
+  $('#view-help').innerHTML = `
+    <h2>Hướng dẫn sử dụng</h2>
+    <div class="card"><h4>Dùng hằng ngày, 3 bước</h4>
+      <ol class="tight">
+        <li>Sau buổi daily, vào <b>Phân tích</b>: chọn team, chọn file ghi âm, bấm Phân tích.</li>
+        <li>Đọc report: Sprint Goal, vướng mắc từng người, impediment, ai thiếu nội dung 3 câu hỏi.</li>
+        <li>Vào <b>Hôm nay</b> để xem tổng hợp mọi team và gỡ các impediment đang mở.</li>
+      </ol>
+      <div class="row"><button data-action="goto" data-view="analyze">Phân tích ngay</button><button class="ghost" data-action="goto" data-view="overview">Xem Hôm nay</button></div>
+    </div>
+    <h3>Câu hỏi thường gặp</h3>
+    <div class="faq">
+      <details><summary>Mật khẩu để làm gì? Quên thì sao?</summary>
+        <p>App không có tài khoản hay máy chủ. API key và nội dung daily lưu trên máy bạn và được mã hóa bằng mật khẩu này. Quên mật khẩu là mất dữ liệu, không ai khôi phục được. Hãy lưu mật khẩu vào trình quản lý mật khẩu.</p></details>
+      <details><summary>Lấy API key ở đâu? Có tốn tiền không?</summary>
+        <p>Vào Cài đặt → Đổi kết nối AI: app có hướng dẫn và link lấy key cho ChatGPT, Gemini, Claude. Gói ChatGPT Plus hay Claude Pro không bao gồm API, cần nạp credit riêng trên trang API. Nên đặt giới hạn chi tiêu hằng tháng cho key.</p></details>
+      <details><summary>Vì sao Claude không chép lời được?</summary>
+        <p>Claude hiện chưa nhận file âm thanh qua API. Hãy dùng ChatGPT hoặc Gemini để chép lời, Claude vẫn dùng được cho bước phân tích.</p></details>
+      <details><summary>App tách sai người, sai tên. Làm sao cho đúng?</summary>
+        <ul class="tight"><li>Thống nhất với team: mỗi người tự xưng tên khi đến lượt.</li>
+          <li>Trong thẻ Team, ghi tên thành viên đúng cách gọi thật; có thể thêm tên gọi khác trong ngoặc, ví dụ "Nam (anh Nam, Nam BE)".</li>
+          <li>Ghi âm gần người nói, tránh phòng ồn.</li></ul></details>
+      <details><summary>Dùng trên điện thoại hoặc máy khác thế nào?</summary>
+        <p>Cài đặt → Đồng bộ: bật đồng bộ Google Drive. Trên máy kia mở app, chọn "Tôi đã dùng app trên thiết bị khác", nhập đúng mật khẩu. Hoặc dùng file sao lưu.</p></details>
+      <details><summary>File ghi âm có bị lưu lại không?</summary>
+        <p>Không. File chỉ được gửi tới AI chép lời bạn chọn rồi bỏ đi. App chỉ giữ transcript và report, đã mã hóa.</p></details>
+      <details><summary>File quá lớn thì sao?</summary>
+        <p>ChatGPT nhận tối đa 25 MB, Gemini khoảng 15 MB. Một buổi daily 15 phút thường chỉ vài MB. Nếu lớn hơn, hãy xuất lại file dạng mp3 hoặc cắt ngắn.</p></details>
+      <details><summary>Có nên xin phép team trước khi ghi âm?</summary>
+        <p>Có. Hãy nói rõ mục đích là giúp PM gỡ vướng, không dùng để đánh giá cá nhân, và cho team xem report của chính họ.</p></details>
+    </div>
+    <p><a href="#" data-action="show-privacy">Dữ liệu của bạn được xử lý thế nào</a></p>`;
 }
 
 function openReport(id, from) {
@@ -608,25 +690,33 @@ function openReport(id, from) {
 let editingTeam = null;
 function renderTeams() {
   const teams = teamsSorted(), t = editingTeam ? S().teams[editingTeam] : null;
+  const intro = !teams.length ? `${stepperHtml(3)}
+    <div class="callout"><b>Thêm team bạn muốn theo dõi.</b> App dùng danh sách thành viên để biết ai đang nói, và dùng Sprint Goal để đánh giá team có đi đúng hướng không. Bạn có thể thêm nhiều team, sửa lại bất cứ lúc nào.</div>` : '';
   $('#view-teams').innerHTML = `
+    ${intro}
     <h2>Team của bạn</h2>
     ${teams.length ? teams.map(x => `<div class="list-item"><div><b>${esc(x.name)}</b> · ${esc(x.project)}
         <div class="muted small">${esc(x.members.join(', '))}</div>
         <div class="muted small">Sprint ${esc(x.sprintStart || '?')} → ${esc(x.sprintEnd || '?')} · ${esc(x.sprintGoal)}</div></div>
         <span><button class="ghost sm" data-action="edit-team" data-id="${x.id}">Sửa</button>
         <button class="danger sm" data-action="delete-team" data-id="${x.id}">Xóa</button></span></div>`).join('')
-      : '<p class="muted">Chưa có team nào. Thêm team đầu tiên bên dưới.</p>'}
+      : '<p class="muted">Chưa có team nào. Điền form bên dưới để thêm team đầu tiên.</p>'}
     <div class="card">
       <h4>${t ? 'Sửa team' : 'Thêm team'}</h4>
-      <label for="tName">Tên team</label><input id="tName" value="${esc(t?.name || '')}">
-      <label for="tProject">Project</label><input id="tProject" value="${esc(t?.project || '')}">
-      <label for="tMembers">Thành viên (cách nhau dấu phẩy; có thể thêm tên gọi khác trong ngoặc)</label>
-      <textarea id="tMembers" rows="2">${esc(t ? t.members.join(', ') : '')}</textarea>
+      <label for="tName">Tên team <span class="muted">· bắt buộc</span></label>
+      <input id="tName" placeholder="Ví dụ: Invoice A" value="${esc(t?.name || '')}">
+      <label for="tProject">Project</label>
+      <input id="tProject" placeholder="Ví dụ: Sapo Invoice" value="${esc(t?.project || '')}">
+      <label for="tMembers">Thành viên <span class="muted">· bắt buộc, cách nhau dấu phẩy</span></label>
+      <textarea id="tMembers" rows="2" placeholder="Ví dụ: Nam (anh Nam, Nam BE), Lan, Hùng">${esc(t ? t.members.join(', ') : '')}</textarea>
+      <p class="muted small">Ghi tên đúng cách mọi người gọi nhau trong buổi daily. Tên gọi khác để trong ngoặc giúp app nhận đúng người.</p>
       <div class="row">
         <div><label for="tStart">Bắt đầu sprint</label><input id="tStart" type="date" value="${esc(t?.sprintStart || '')}"></div>
         <div><label for="tEnd">Kết thúc sprint</label><input id="tEnd" type="date" value="${esc(t?.sprintEnd || '')}"></div>
       </div>
-      <label for="tGoal">Sprint Goal</label><textarea id="tGoal" rows="2">${esc(t?.sprintGoal || '')}</textarea>
+      <label for="tGoal">Sprint Goal</label>
+      <textarea id="tGoal" rows="2" placeholder="Ví dụ: Ra mắt thanh toán QR cho 100% merchant thử nghiệm">${esc(t?.sprintGoal || '')}</textarea>
+      <p class="muted small">Có Sprint Goal thì app mới đánh giá được team đang đúng hướng, có rủi ro hay lệch hướng. Nhớ cập nhật mỗi khi sang sprint mới.</p>
       <button data-action="save-team">${t ? 'Lưu thay đổi' : 'Thêm team'}</button>
       ${t ? '<button class="ghost" data-action="cancel-team">Hủy</button>' : ''}
       <p class="msg" id="teamMsg"></p>
@@ -637,11 +727,12 @@ function renderSettings() {
   const st = setting();
   $('#view-settings').innerHTML = `
     <h2>Kết nối AI</h2>
-    <p>Chuyển giọng nói: <b>${esc(AI[st.stt].label)}</b> · Phân tích: <b>${esc(AI[st.llm].label)}</b></p>
+    <p>Chép lời: <b>${esc(AI[st.stt].label)}</b> · Phân tích: <b>${esc(AI[st.llm].label)}</b></p>
+    <p class="muted small">Đổi AI, cập nhật key mới hoặc đổi model.</p>
     <button class="ghost" data-action="open-onboard">Đổi kết nối AI</button>
 
     <h2>Đồng bộ giữa các thiết bị</h2>
-    <p class="muted">Bản mã hóa được lưu trong thư mục ẩn dành riêng cho app trong Google Drive của bạn. App không thấy file nào khác trong Drive.</p>
+    <p class="muted">Bật để dùng app trên cả máy tính và iPad/điện thoại. Bản đã mã hóa được lưu trong thư mục ẩn dành riêng cho app trong Google Drive của bạn; app không thấy file nào khác trong Drive. Trên máy khác, chọn "Tôi đã dùng app trên thiết bị khác" và nhập cùng mật khẩu.</p>
     ${CFG.GOOGLE_CLIENT_ID ? (st.syncEnabled
       ? `<p><span class="badge good">Đang bật</span></p>
          <button data-action="sync-now">Đồng bộ ngay</button>
@@ -651,7 +742,7 @@ function renderSettings() {
       : '<p class="warn">Người triển khai app chưa cấu hình Google Client ID nên chưa dùng được đồng bộ. Bạn vẫn có thể dùng file sao lưu.</p>'}
 
     <h2>Sao lưu</h2>
-    <p class="muted">File sao lưu được mã hóa bằng mật khẩu của bạn. Dùng để chuyển sang thiết bị khác hoặc lưu trữ.</p>
+    <p class="muted">Dữ liệu trong trình duyệt có thể mất nếu xóa lịch sử duyệt web, hoặc Safari tự dọn khi lâu không mở app. Nên tải file sao lưu định kỳ. File được mã hóa bằng mật khẩu của bạn.</p>
     <button class="ghost" data-action="export-backup">Tải file sao lưu</button>
 
     <h2>Bảo mật và quyền riêng tư</h2>
@@ -680,13 +771,19 @@ function busy(btn, on, text) {
 
 /* ---------- Xử lý thao tác ---------- */
 const actions = {
+  'go-create'() { setMsg('#createMsg', ''); showScreen('create'); $('#newPass').focus(); },
+  'go-restore'() { setMsg('#setupMsg', ''); showScreen('restore'); },
+  'go-welcome'() { showScreen('welcome'); },
+  goto(el) { showView(el.dataset.view); },
+  async 'hide-checklist'() { setting().hideChecklist = true; touchSettings(); await persist(); renderOverview(); },
   async 'create-vault'(btn) {
     const p1 = $('#newPass').value, p2 = $('#newPass2').value;
-    if (p1.length < 10) return setMsg('#setupMsg', 'Mật khẩu cần ít nhất 10 ký tự.', 'err');
-    if (p1 !== p2) return setMsg('#setupMsg', 'Hai lần nhập mật khẩu không khớp.', 'err');
+    if (p1.length < 10) return setMsg('#createMsg', 'Mật khẩu cần ít nhất 10 ký tự.', 'err');
+    if (p1 !== p2) return setMsg('#createMsg', 'Hai lần nhập mật khẩu không khớp.', 'err');
+    if (!$('#ackPass').checked) return setMsg('#createMsg', 'Hãy tích ô xác nhận đã lưu mật khẩu ở nơi an toàn.', 'err');
     busy(btn, true, 'Đang tạo...');
     try { await createSession(p1, newState()); $('#newPass').value = $('#newPass2').value = ''; enterApp(); }
-    catch (e) { setMsg('#setupMsg', e.message, 'err'); }
+    catch (e) { setMsg('#createMsg', e.message, 'err'); }
     finally { busy(btn, false); }
   },
   'restore-drive'(btn) {
@@ -749,7 +846,7 @@ const actions = {
     await idb.del('vault'); await idb.del('syncHint');
     session = null; location.reload();
   },
-  'show-privacy'() { privacyReturn = $$('.screen.on')[0]?.id.replace('screen-', '') || 'setup'; showScreen('privacy'); },
+  'show-privacy'() { privacyReturn = $$('.screen.on')[0]?.id.replace('screen-', '') || 'welcome'; showScreen('privacy'); },
   'close-privacy'() { showScreen(privacyReturn); },
 
   'open-onboard'() { openOnboard(); },
@@ -803,13 +900,17 @@ const actions = {
         '--- TRANSCRIPT ---', transcript
       ].join('\n');
       const result = parseResult(await callLLM(SYSTEM_PROMPT, userMsg));
+      const isFirst = !live('dailies').length;
       const d = { id: uid(), date: todayStr(), teamId: team.id, teamName: team.name, transcript, result,
                   createdAt: now(), updatedAt: now() };
       S().dailies[d.id] = d;
       await persist();
       $('#audio').value = '';
+      $('#analyzeIntro').innerHTML = '';
       setMsg('#analyzeMsg', 'Xong. File ghi âm không được lưu lại.', 'ok');
-      $('#analyzeReport').innerHTML = renderReportHtml(d);
+      $('#analyzeReport').innerHTML = (isFirst ? `<div class="callout"><b>Hoàn tất 4 bước!</b> Report đầu tiên ở ngay dưới đây.
+        Từ giờ, sau mỗi buổi daily chỉ cần vào thẻ Phân tích. Thẻ <a href="#" data-action="goto" data-view="overview">Hôm nay</a> tổng hợp mọi team và impediment đang mở.
+        Nên vào <a href="#" data-action="goto" data-view="settings">Cài đặt</a> để bật đồng bộ hoặc tải file sao lưu.</div>` : '') + renderReportHtml(d);
     } catch (e) { setMsg('#analyzeMsg', e.message, 'err'); }
     finally { busy(btn, false); }
   },
@@ -844,11 +945,15 @@ const actions = {
     if (!name) return setMsg('#teamMsg', 'Nhập tên team.', 'err');
     if (!members.length) return setMsg('#teamMsg', 'Nhập ít nhất 1 thành viên.', 'err');
     const id = editingTeam || uid();
+    const wasFirst = !teamsSorted().length;
     S().teams[id] = { id, name, project: $('#tProject').value.trim(), members,
       sprintStart: $('#tStart').value, sprintEnd: $('#tEnd').value, sprintGoal: $('#tGoal').value.trim(), updatedAt: now() };
     editingTeam = null;
-    await persist(); renderTeams();
-    setMsg('#teamMsg', 'Đã lưu team ' + name + '.', 'ok');
+    await persist();
+    // Team đầu tiên trong luồng làm quen: chuyển sang bước 4
+    if (wasFirst && !live('dailies').length) { showView('analyze'); $('#teamSel').value = id; return; }
+    renderTeams();
+    setMsg('#teamMsg', 'Đã lưu team ' + name + '. Thêm team khác, hoặc sang thẻ Phân tích.', 'ok');
   },
   async 'delete-team'(el) {
     const t = S().teams[el.dataset.id];
@@ -881,12 +986,13 @@ const actions = {
     }).catch(e => setSync(e.message, 'err'));
   },
   async 'export-backup'() {
+    if (!setting().backedUp) { setting().backedUp = true; touchSettings(); await persist(); }
     const blob = await encryptState(S());
     download(`daily-scrum-${todayStr()}.dsbackup`, JSON.stringify(blob), 'application/json');
   }
 };
 
-let privacyReturn = 'setup', pendingSyncHint = false;
+let privacyReturn = 'welcome', pendingSyncHint = false;
 
 document.addEventListener('click', e => {
   const nav = e.target.closest('nav [data-view]');
@@ -898,6 +1004,10 @@ document.addEventListener('click', e => {
   if (fn) Promise.resolve(fn(el, e)).catch(err => alert(err.message));
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset.change === 'show-pass') {
+    e.target.dataset.target.split(',').forEach(id => { $('#' + id).type = e.target.checked ? 'text' : 'password'; });
+    return;
+  }
   if (e.target.dataset.change !== 'pick-ai') return;
   const which = e.target.id === 'sttSel' ? 'stt' : 'llm';
   $('#' + which + 'Model').value = AI[e.target.value][which + 'Model'] || '';
@@ -917,7 +1027,7 @@ document.addEventListener('keydown', e => {
   try {
     const vault = await idb.get('vault');
     pendingSyncHint = !!(await idb.get('syncHint'));
-    showScreen(vault ? 'lock' : 'setup');
+    showScreen(vault ? 'lock' : 'welcome');
   } catch {
     document.body.innerHTML = '<p class="center">Không mở được bộ nhớ của trình duyệt. Nếu đang dùng chế độ ẩn danh, hãy mở trang ở cửa sổ thường.</p>';
   }

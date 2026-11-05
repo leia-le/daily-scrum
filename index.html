@@ -24,63 +24,119 @@
 
 <div id="screen-loading" class="screen on"><p class="muted center">Đang tải...</p></div>
 
-<!-- Tạo kho dữ liệu lần đầu, hoặc khôi phục -->
-<div id="screen-setup" class="screen">
+<!-- Chào mừng: lần đầu mở app trên thiết bị này -->
+<div id="screen-welcome" class="screen">
   <div class="panel">
     <h1>Daily Scrum</h1>
-    <p class="muted">Phân tích buổi daily từ file ghi âm. Mọi dữ liệu nằm trên máy của bạn và trong Google Drive của chính bạn, luôn được mã hóa.</p>
+    <p class="lead">Trợ lý giúp PM nắm tình hình các team mà không cần dự mọi buổi daily.</p>
+    <div class="card">
+      <h4>App làm gì cho bạn</h4>
+      <ul class="tight">
+        <li>Bạn tải lên file ghi âm buổi daily.</li>
+        <li>App chép lời, tách báo cáo từng thành viên: hôm qua, hôm nay, vướng mắc.</li>
+        <li>Đánh giá Sprint Goal, liệt kê impediment cần bạn gỡ, nhắc ai chưa trả lời đủ 3 câu hỏi.</li>
+      </ul>
+    </div>
+    <h2>Bắt đầu trong 4 bước, khoảng 10 phút</h2>
+    <ol class="steps-intro">
+      <li><b>Đặt mật khẩu</b> để khóa dữ liệu trên máy bạn.</li>
+      <li><b>Kết nối AI</b> của bạn (ChatGPT, Gemini hoặc Claude). App hướng dẫn lấy key từng bước.</li>
+      <li><b>Thêm team</b>: tên, thành viên, Sprint Goal.</li>
+      <li><b>Phân tích</b> buổi daily đầu tiên.</li>
+    </ol>
+    <button data-action="go-create">Bắt đầu</button>
+    <button class="ghost" data-action="go-restore">Tôi đã dùng app trên thiết bị khác</button>
+    <p class="muted small center-text"><a href="#" data-action="show-privacy">Dữ liệu của bạn được xử lý thế nào?</a></p>
+  </div>
+</div>
 
-    <h2>Bắt đầu mới</h2>
-    <label for="newPass">Đặt mật khẩu bảo vệ dữ liệu (ít nhất 10 ký tự)</label>
+<!-- Bước 1: đặt mật khẩu -->
+<div id="screen-create" class="screen">
+  <div class="panel">
+    <div data-stepper="1"></div>
+    <h1>Đặt mật khẩu bảo vệ dữ liệu</h1>
+    <p class="muted">App không có tài khoản hay máy chủ. API key và nội dung daily được lưu ngay trên máy bạn, và mật khẩu này dùng để <b>mã hóa</b> chúng. Mỗi lần mở app, bạn nhập mật khẩu để mở khóa.</p>
+    <label for="newPass">Mật khẩu (ít nhất 10 ký tự)</label>
     <input id="newPass" type="password" autocomplete="new-password">
     <label for="newPass2">Nhập lại mật khẩu</label>
     <input id="newPass2" type="password" autocomplete="new-password">
-    <p class="warn">Mật khẩu dùng để mã hóa API key và dữ liệu. Quên mật khẩu là mất dữ liệu, không ai khôi phục được, kể cả người làm ra app.</p>
-    <button data-action="create-vault">Tạo kho dữ liệu</button>
+    <label class="check"><input type="checkbox" data-change="show-pass" data-target="newPass,newPass2"> Hiện mật khẩu</label>
+    <div class="callout warn-box">
+      <b>Quên mật khẩu là mất dữ liệu.</b> Không có chức năng lấy lại mật khẩu, và không ai khôi phục được, kể cả người làm ra app. Hãy lưu mật khẩu vào trình quản lý mật khẩu (iCloud Keychain, 1Password...).
+    </div>
+    <label class="check"><input type="checkbox" id="ackPass"> Tôi đã hiểu và đã lưu mật khẩu ở nơi an toàn</label>
+    <button data-action="create-vault">Tiếp tục: kết nối AI</button>
+    <button class="ghost" data-action="go-welcome">← Quay lại</button>
+    <p id="createMsg" class="msg"></p>
+  </div>
+</div>
 
-    <h2>Đã dùng trên thiết bị khác</h2>
+<!-- Khôi phục từ thiết bị khác -->
+<div id="screen-restore" class="screen">
+  <div class="panel">
+    <h1>Khôi phục dữ liệu</h1>
+    <p class="muted">Dùng khi bạn đã dùng app trên máy khác. Nhập đúng mật khẩu đã đặt ở lần đầu, rồi chọn nơi lấy dữ liệu.</p>
     <label for="restorePass">Mật khẩu bạn đã đặt</label>
     <input id="restorePass" type="password" autocomplete="current-password">
-    <button class="ghost" data-action="restore-drive">Khôi phục từ Google Drive</button>
-    <label for="restoreFile">Hoặc chọn file sao lưu (.dsbackup)</label>
-    <input id="restoreFile" type="file" accept=".dsbackup,application/json">
-    <button class="ghost" data-action="restore-file">Khôi phục từ file</button>
+    <label class="check"><input type="checkbox" data-change="show-pass" data-target="restorePass"> Hiện mật khẩu</label>
+    <div class="card">
+      <h4>Cách 1 — Từ Google Drive</h4>
+      <p class="muted small">Dùng được nếu trên máy cũ bạn đã bật đồng bộ (Cài đặt → Đồng bộ). App sẽ mở cửa sổ đăng nhập Google.</p>
+      <button data-action="restore-drive">Khôi phục từ Google Drive</button>
+    </div>
+    <div class="card">
+      <h4>Cách 2 — Từ file sao lưu</h4>
+      <p class="muted small">File đuôi <code>.dsbackup</code> tải về từ Cài đặt → Sao lưu trên máy cũ.</p>
+      <input id="restoreFile" type="file" accept=".dsbackup,application/json">
+      <button class="ghost" data-action="restore-file">Khôi phục từ file</button>
+    </div>
+    <button class="ghost" data-action="go-welcome">← Quay lại</button>
     <p id="setupMsg" class="msg"></p>
-    <p class="muted small"><a href="#" data-action="show-privacy">Dữ liệu của bạn được xử lý thế nào?</a></p>
   </div>
 </div>
 
 <!-- Mở khóa -->
 <div id="screen-lock" class="screen">
   <div class="panel">
-    <h1>Daily Scrum</h1>
-    <p class="muted">Dữ liệu đang được khóa. Nhập mật khẩu để mở.</p>
+    <h1>Mở khóa Daily Scrum</h1>
+    <p class="muted">Dữ liệu của bạn đang được mã hóa trên máy này. Nhập mật khẩu đã đặt ở lần đầu để mở.</p>
     <label for="unlockPass">Mật khẩu</label>
     <input id="unlockPass" type="password" autocomplete="current-password">
+    <label class="check"><input type="checkbox" data-change="show-pass" data-target="unlockPass"> Hiện mật khẩu</label>
     <button data-action="unlock">Mở khóa</button>
     <p id="lockMsg" class="msg"></p>
-    <p class="muted small">Quên mật khẩu? Chỉ có thể xóa dữ liệu trên máy và bắt đầu lại.
-      <a href="#" data-action="wipe-local">Xóa dữ liệu trên máy này</a></p>
+    <details class="small">
+      <summary class="muted">Quên mật khẩu?</summary>
+      <p class="muted">Không thể lấy lại mật khẩu. Bạn chỉ có thể xóa dữ liệu trên máy này và bắt đầu lại. Nếu còn nhớ mật khẩu trên máy khác thì đừng xóa.</p>
+      <button class="danger" data-action="wipe-local">Xóa dữ liệu trên máy này và bắt đầu lại</button>
+    </details>
   </div>
 </div>
 
-<!-- Kết nối AI: chỉ hiện khi chưa kết nối xong, hoặc khi người dùng chủ động đổi -->
+<!-- Bước 2: kết nối AI. Chỉ hiện khi chưa kết nối xong, hoặc khi người dùng chủ động đổi -->
 <div id="screen-onboard" class="screen">
   <div class="panel wide">
-    <h1>Kết nối AI (chỉ cần làm 1 lần)</h1>
-    <p class="muted">Chọn AI của bạn cho 2 bước và kiểm tra kết nối. Key được mã hóa và chỉ gửi tới đúng nhà cung cấp đó.</p>
-    <label for="sttSel">Bước 1 — Chuyển giọng nói thành chữ</label>
+    <div data-stepper="2" id="onboardStepper"></div>
+    <h1>Kết nối AI của bạn</h1>
+    <p class="muted">App dùng AI cho 2 việc: <b>chép lời</b> file ghi âm, rồi <b>phân tích</b> nội dung. Bạn dùng tài khoản AI của chính mình, nên chi phí và dữ liệu đi theo tài khoản của bạn. Chỉ cần làm 1 lần.</p>
+    <div class="callout">
+      <b>Gợi ý nhanh:</b> nếu bạn chỉ có 1 tài khoản, chọn <b>ChatGPT</b> hoặc <b>Gemini</b> cho cả 2 bước là đủ, chỉ cần 1 key.
+      Nếu muốn phân tích tốt nhất, chọn ChatGPT hoặc Gemini để chép lời và <b>Claude</b> để phân tích.
+    </div>
+    <label for="sttSel">Việc 1 — Chuyển giọng nói thành chữ</label>
     <select id="sttSel" data-change="pick-ai"></select>
     <p id="sttNote" class="warn"></p>
-    <label for="llmSel">Bước 2 — Phân tích daily</label>
+    <label for="llmSel">Việc 2 — Phân tích daily</label>
     <select id="llmSel" data-change="pick-ai"></select>
+    <p class="muted small">Với mỗi AI bên dưới: làm theo hướng dẫn để lấy key, dán vào ô, rồi bấm <b>Lưu và kiểm tra kết nối</b>. Khi tất cả hiện "đã kết nối", nút Tiếp tục sẽ sáng lên.</p>
     <div id="guides"></div>
     <details>
       <summary class="muted">Tuỳ chọn model</summary>
       <label for="sttModel">Model chuyển giọng nói</label><input id="sttModel">
       <label for="llmModel">Model phân tích</label><input id="llmModel">
     </details>
-    <button id="doneBtn" data-action="finish-onboard" disabled>Hoàn tất, bắt đầu dùng</button>
+    <p id="doneHint" class="muted small"></p>
+    <button id="doneBtn" data-action="finish-onboard" disabled>Tiếp tục: thêm team</button>
     <button id="cancelOnboard" class="ghost" data-action="cancel-onboard">Quay lại</button>
   </div>
 </div>
@@ -100,21 +156,37 @@
     <button data-view="history">Lịch sử</button>
     <button data-view="teams">Team</button>
     <button data-view="settings">Cài đặt</button>
+    <button data-view="help">Hướng dẫn</button>
   </nav>
   <main>
     <section id="view-overview" class="view"></section>
     <section id="view-analyze" class="view">
-      <label for="teamSel">Team</label>
+      <div id="analyzeIntro"></div>
+      <h2>Phân tích buổi daily</h2>
+      <p class="muted">Chọn team, chọn file ghi âm rồi bấm Phân tích. Mất khoảng 1–3 phút. File ghi âm không được lưu lại.</p>
+      <label for="teamSel">1. Chọn team</label>
       <select id="teamSel"></select>
-      <label for="audio">File ghi âm (không được lưu lại sau khi phân tích)</label>
+      <label for="audio">2. Chọn file ghi âm (m4a, mp3, wav...)</label>
       <input id="audio" type="file" accept="audio/*">
-      <button id="goBtn" data-action="analyze">Phân tích</button>
+      <button id="goBtn" data-action="analyze">3. Phân tích</button>
       <p id="analyzeMsg" class="msg"></p>
+      <details class="card">
+        <summary><b>Mẹo để report chính xác</b></summary>
+        <ul class="tight">
+          <li>Thống nhất với team: mỗi người <b>tự xưng tên</b> khi đến lượt ("Em là Nam, hôm qua em...").</li>
+          <li>Trả lời đủ 3 câu: hôm qua làm gì, hôm nay làm gì, có vướng mắc gì không. Không có vướng mắc thì nói "không có".</li>
+          <li>Nhắc <b>mã issue</b> nếu có (ví dụ #123).</li>
+          <li>Điện thoại đặt giữa bàn, tránh phòng ồn. Daily trên Google Meet thì dùng bản ghi của Meet.</li>
+          <li>Tên thành viên trong thẻ Team càng đúng cách gọi thật, app tách người càng chuẩn.</li>
+          <li>Xin đồng ý của các thành viên trước khi ghi âm.</li>
+        </ul>
+      </details>
       <div id="analyzeReport"></div>
     </section>
     <section id="view-history" class="view"></section>
     <section id="view-teams" class="view"></section>
     <section id="view-settings" class="view"></section>
+    <section id="view-help" class="view"></section>
     <section id="view-report" class="view"></section>
   </main>
 </div>
@@ -131,7 +203,7 @@
       <li><b>Nhà cung cấp AI</b> xử lý nội dung bạn gửi theo điều khoản của họ. API trả phí của OpenAI và Anthropic mặc định không dùng dữ liệu để huấn luyện; với Gemini gói miễn phí, Google có thể dùng dữ liệu để cải thiện sản phẩm, nên dùng gói trả phí cho dữ liệu công việc.</li>
       <li>Hãy xin đồng ý của các thành viên trước khi ghi âm daily.</li>
     </ul>
-    <button data-action="close-privacy">Đã hiểu</button>
+    <button data-action="close-privacy">Đã hiểu, quay lại</button>
   </div>
 </div>
 
