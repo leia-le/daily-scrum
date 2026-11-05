@@ -22,36 +22,121 @@ const AI = {
     label: 'ChatGPT (OpenAI)', canTranscribe: true, maxMB: 25,
     sttModel: 'gpt-4o-transcribe', llmModel: 'gpt-5',
     keyUrl: 'https://platform.openai.com/api-keys',
-    guide: [
-      'Đăng nhập platform.openai.com bằng tài khoản OpenAI của bạn.',
-      'Vào Billing và nạp credit (gói ChatGPT Plus không bao gồm API).',
-      'Vào API keys → Create new secret key, sao chép key bắt đầu bằng sk-.',
-      'Nên đặt giới hạn chi tiêu hằng tháng trong mục Limits.',
-      'Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.'
-    ]
+    plans: {
+      payg: {
+        label: 'Free / Go / Plus',
+        intro: 'Các gói này không kèm API. API tính tiền riêng theo mức dùng, thanh toán tách khỏi gói ChatGPT.',
+        steps: [
+          ['Mở platform.openai.com, đăng nhập (dùng được cùng email với ChatGPT).', 'https://platform.openai.com'],
+          ['Settings → Billing → Add payment method, nạp trước một khoản nhỏ (ví dụ 5–10 USD).', 'https://platform.openai.com/settings/organization/billing/overview'],
+          ['Mục Limits: đặt ngân sách tháng và email cảnh báo để không bị trừ quá tay.', 'https://platform.openai.com/settings/organization/limits'],
+          ['API keys → Create new secret key, sao chép key bắt đầu bằng sk-.', 'https://platform.openai.com/api-keys'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ],
+        cost: 'Ước tính: chép lời khoảng 0,006 USD/phút ghi âm. Daily 15 phút × 22 buổi ≈ 2 USD/tháng cho mỗi team, phân tích thêm vài cent mỗi buổi.'
+      },
+      pro: {
+        label: 'Pro / Business',
+        intro: 'Gói Pro và Business có credit API hằng tháng (Pro: bằng giá gói 100/200/500 USD; Business: 20 USD mỗi ghế Standard, 100 USD mỗi ghế Premium, tối đa 500 USD). Bạn chỉ cần nhận credit một lần, các tháng sau tự cấp.',
+        steps: [
+          ['Mở platform.openai.com, đăng nhập bằng cùng email với tài khoản ChatGPT. Bạn cần là Owner của organization API.', 'https://platform.openai.com'],
+          ['Trong ChatGPT: Settings → Billing → API credits, chọn organization API ở bước 1 để nhận credit.', 'https://chatgpt.com/#settings'],
+          ['Kiểm tra lại ở platform.openai.com → Billing → Credit grants.', 'https://platform.openai.com/settings/organization/billing/credit-grants'],
+          ['API keys → Create new secret key, sao chép key bắt đầu bằng sk-.', 'https://platform.openai.com/api-keys'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ],
+        caveats: [
+          'Gói cần dùng đủ 7 ngày mới nhận được credit.',
+          'Credit hết hạn theo từng chu kỳ thanh toán, không cộng dồn.',
+          'Tính năng đang mở dần theo quốc gia. Chưa thấy mục API credits thì làm theo hướng dẫn Free / Go / Plus.',
+          'Sau buổi phân tích đầu tiên, xem mục Usage để chắc phần chép lời cũng được trừ vào credit.'
+        ]
+      },
+      api: {
+        label: 'Đã có tài khoản API',
+        intro: 'Bạn đã có tài khoản platform.openai.com đang có credit.',
+        steps: [
+          ['API keys → Create new secret key. Nên tạo key riêng cho app này để dễ thu hồi.', 'https://platform.openai.com/api-keys'],
+          ['Kiểm tra Limits có ngân sách tháng hợp lý.', 'https://platform.openai.com/settings/organization/limits'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ]
+      }
+    }
   },
   gemini: {
     label: 'Gemini (Google)', canTranscribe: true, maxMB: 15,
     sttModel: 'gemini-2.5-flash', llmModel: 'gemini-2.5-flash',
     keyUrl: 'https://aistudio.google.com/apikey',
-    guide: [
-      'Mở Google AI Studio, đăng nhập bằng tài khoản Google của bạn.',
-      'Bấm Create API key, chọn hoặc tạo một Google Cloud project.',
-      'Với dữ liệu công việc, nên bật thanh toán (gói trả phí): ở gói miễn phí Google có thể dùng nội dung để cải thiện sản phẩm.',
-      'Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.'
-    ]
+    plans: {
+      paid: {
+        label: 'Google AI Pro / Ultra / trả phí',
+        intro: 'Gói Google AI Pro, Ultra chỉ dùng trong ứng dụng Gemini và AI Studio trên web, không bao gồm Gemini API. API cần bật thanh toán Google Cloud riêng. Bù lại, ở chế độ trả phí Google không dùng dữ liệu của bạn để huấn luyện.',
+        steps: [
+          ['Mở Google AI Studio → Create API key, chọn hoặc tạo một Google Cloud project.', 'https://aistudio.google.com/apikey'],
+          ['Bấm Set up billing cạnh key để gắn tài khoản thanh toán Google Cloud, chuyển key sang chế độ trả phí.', 'https://aistudio.google.com/apikey'],
+          ['Nếu có Google AI Pro hoặc Ultra: tham gia Google Developer Program để nhận credit Google Cloud hằng tháng, dùng được cho Gemini API.', 'https://developers.google.com/program'],
+          ['Trong Google Cloud Billing, đặt Budget alert để nhận cảnh báo chi tiêu.', 'https://console.cloud.google.com/billing'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ],
+        caveats: [
+          'Tài khoản thanh toán kiểu trả trước cần số dư lớn hơn 0 USD thì credit khuyến mãi mới được kích hoạt.'
+        ]
+      },
+      free: {
+        label: 'Miễn phí',
+        intro: 'Gói miễn phí dùng được ngay, không cần thẻ, nhưng Google có thể dùng nội dung gửi lên để cải thiện sản phẩm. Chỉ nên dùng để thử với file ghi âm không nhạy cảm.',
+        steps: [
+          ['Mở Google AI Studio, đăng nhập bằng tài khoản Google.', 'https://aistudio.google.com/apikey'],
+          ['Bấm Create API key, chọn hoặc tạo một Google Cloud project, sao chép key.'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.'],
+          ['Khi dùng cho daily thật, quay lại chọn hướng dẫn "trả phí" để bật thanh toán cho chính key này.']
+        ],
+        caveats: ['Gói miễn phí giới hạn số lượt gọi mỗi phút và mỗi ngày, có thể báo lỗi khi phân tích liên tục nhiều team.']
+      }
+    }
   },
   claude: {
     label: 'Claude (Anthropic)', canTranscribe: false,
     llmModel: 'claude-sonnet-5-5',
     keyUrl: 'https://console.anthropic.com/settings/keys',
-    guide: [
-      'Đăng nhập console.anthropic.com bằng tài khoản Anthropic của bạn.',
-      'Vào Billing và nạp credit (gói Claude Pro/Max không bao gồm API).',
-      'Vào API keys → Create key, sao chép key bắt đầu bằng sk-ant-.',
-      'Nên đặt giới hạn chi tiêu hằng tháng trong mục Limits.',
-      'Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.'
-    ],
+    plans: {
+      max: {
+        label: 'Max / Team',
+        intro: 'Gói Max và Team có credit API hằng tháng (Max 5x: 100 USD, Max 20x: 200 USD, Team: tối đa 500 USD dùng chung). Chỉ cần liên kết một lần.',
+        steps: [
+          ['Mở console.anthropic.com, đăng nhập hoặc tạo organization. Bạn cần quyền Owner, Admin hoặc Billing trong organization đó.', 'https://console.anthropic.com'],
+          ['Trong claude.ai: Settings → Billing → API credits → Link organization, chọn organization ở bước 1. Gói Team: Organization settings → Billing.', 'https://claude.ai/settings/billing'],
+          ['Kiểm tra credit đã vào ở Console → Billing.', 'https://console.anthropic.com/settings/billing'],
+          ['API keys → Create key, sao chép key bắt đầu bằng sk-ant-.', 'https://console.anthropic.com/settings/keys'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ],
+        caveats: [
+          'Gói cần dùng đủ 7 ngày mới nhận được credit.',
+          'Đã liên kết thì không tự đổi sang organization khác được, nên chọn kỹ.',
+          'Credit hết hạn theo từng chu kỳ thanh toán, không cộng dồn.'
+        ]
+      },
+      payg: {
+        label: 'Free / Pro',
+        intro: 'Gói Free và Pro không kèm API. API tính tiền riêng theo mức dùng trên Claude Console.',
+        steps: [
+          ['Mở console.anthropic.com, đăng nhập (dùng được cùng email với claude.ai).', 'https://console.anthropic.com'],
+          ['Settings → Billing, thêm thẻ và nạp trước một khoản nhỏ (ví dụ 5 USD).', 'https://console.anthropic.com/settings/billing'],
+          ['Mục Limits: đặt giới hạn chi tiêu hằng tháng.', 'https://console.anthropic.com/settings/limits'],
+          ['API keys → Create key, sao chép key bắt đầu bằng sk-ant-.', 'https://console.anthropic.com/settings/keys'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ],
+        cost: 'Ước tính: phân tích một buổi daily tốn vài cent.'
+      },
+      api: {
+        label: 'Đã có tài khoản API',
+        intro: 'Bạn đã có Claude Console đang có credit.',
+        steps: [
+          ['API keys → Create key. Nên tạo key riêng cho app này để dễ thu hồi.', 'https://console.anthropic.com/settings/keys'],
+          ['Dán key vào ô bên dưới, bấm Lưu và kiểm tra kết nối.']
+        ]
+      }
+    },
     noSttNote: 'Claude chưa nhận file âm thanh qua API nên chỉ dùng được cho bước Phân tích. Hãy chọn ChatGPT hoặc Gemini cho bước Chuyển giọng nói.'
   }
 };
@@ -472,21 +557,54 @@ function openOnboard() {
   $('#onboardStepper').dataset.stepper = '2';
   $('#onboardStepper').style.display = changing ? 'none' : '';
   $('#doneBtn').textContent = changing ? 'Lưu thay đổi' : 'Tiếp tục: thêm team';
+  $('#planPick').innerHTML = '<option value="">— Chọn gói bạn đang dùng —</option>' +
+    Object.entries(PLAN_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
+  $('#planPick').value = PLAN_PRESETS[st.planPick] ? st.planPick : '';
+  renderPlanAdvice();
   showScreen('onboard');
   renderGuides();
+}
+/* Gợi ý theo gói AI người dùng đang trả tiền */
+const PLAN_PRESETS = {
+  chatgpt_pro: { label: 'ChatGPT Pro hoặc Business', stt: 'openai', llm: 'openai', plans: { openai: 'pro' },
+    advice: 'Dùng ChatGPT cho cả 2 việc, chỉ cần 1 key. Chi phí trừ vào credit API hằng tháng đi kèm gói của bạn.' },
+  claude_max: { label: 'Claude Max hoặc Team', stt: 'gemini', llm: 'claude', plans: { claude: 'max', gemini: 'paid' },
+    advice: 'Claude phân tích, chi phí trừ vào credit API của gói Max/Team. Claude chưa chép lời được, nên cần thêm Gemini (hoặc ChatGPT) cho bước chép lời, tốn khoảng vài USD mỗi tháng.' },
+  google_ai: { label: 'Google AI Pro hoặc Ultra', stt: 'gemini', llm: 'gemini', plans: { gemini: 'paid' },
+    advice: 'Dùng Gemini cho cả 2 việc, chỉ cần 1 key. Lưu ý gói Google AI không bao gồm API: cần bật thanh toán Google Cloud, có thể dùng credit Google Developer Program hằng tháng.' },
+  basic: { label: 'ChatGPT Plus / Go, Claude Pro, hoặc gói miễn phí', stt: 'openai', llm: 'openai', plans: { openai: 'payg', claude: 'payg' },
+    advice: 'Các gói này không kèm API, nên cần nạp tiền API riêng. Đơn giản nhất là ChatGPT cho cả 2 việc: khoảng 2–3 USD mỗi tháng cho 1 team daily 15 phút/ngày.' },
+  api: { label: 'Tôi đã có tài khoản API (developer)', plans: { openai: 'api', claude: 'api', gemini: 'paid' },
+    advice: 'Chọn AI bạn muốn ở 2 ô bên dưới, rồi tạo key riêng cho app này.' }
+};
+function planOf(k) {
+  const st = setting(), ps = Object.keys(AI[k].plans);
+  return (st.plans && ps.includes(st.plans[k])) ? st.plans[k] : ps[0];
+}
+function setPlan(k, plan) { const st = setting(); st.plans = st.plans || {}; st.plans[k] = plan; }
+function renderPlanAdvice() {
+  const pre = PLAN_PRESETS[$('#planPick').value];
+  $('#planAdvice').innerHTML = pre ? esc(pre.advice) : 'Chọn gói bạn đang dùng, app sẽ gợi ý AI phù hợp và hướng dẫn đúng cách lấy key cho gói đó.';
 }
 function renderGuides() {
   const st = setting(), stt = $('#sttSel').value, llm = $('#llmSel').value, sttP = AI[stt];
   $('#sttNote').textContent = sttP.canTranscribe ? '' : sttP.noSttNote;
   const need = [...new Set([sttP.canTranscribe ? stt : null, llm].filter(Boolean))];
   $('#guides').innerHTML = need.map(k => {
-    const p = AI[k];
+    const p = AI[k], cur = planOf(k), pl = p.plans[cur];
     const state = st.connected[k] ? '<span class="badge good">đã kết nối</span>'
       : st.keys[k] ? '<span class="badge warn">có key, chưa kiểm tra</span>' : '<span class="badge">chưa kết nối</span>';
+    const link = (u, t) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
     return `<div class="card">
       <h4>Kết nối ${esc(p.label)} ${state}</h4>
-      <ol>${p.guide.map(g => `<li>${esc(g)}</li>`).join('')}</ol>
-      <p><a href="${p.keyUrl}" target="_blank" rel="noopener noreferrer">Mở trang lấy key ${esc(p.label)}</a></p>
+      <p class="small muted">Bạn đang dùng gói nào của ${esc(p.label.split(' ')[0])}?</p>
+      <div class="seg plan-seg">${Object.entries(p.plans).map(([id, x]) =>
+        `<button type="button" class="${id === cur ? 'on' : ''}" data-action="pick-plan" data-provider="${k}" data-plan="${id}">${esc(x.label)}</button>`).join('')}</div>
+      <p class="plan-intro">${esc(pl.intro)}</p>
+      <ol>${pl.steps.map(([t, u]) => `<li>${esc(t)}${u ? ' ' + link(u, 'Mở trang') : ''}</li>`).join('')}</ol>
+      ${pl.caveats ? `<div class="callout warn-box small"><b>Lưu ý</b><ul>${pl.caveats.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
+      ${pl.cost ? `<p class="small muted">${esc(pl.cost)}</p>` : ''}
+      <p>${link(p.keyUrl, 'Mở trang lấy key ' + p.label)}</p>
       <input type="password" autocomplete="off" data-key="${k}" placeholder="${st.keys[k] ? 'Để trống nếu không đổi' : 'Dán key vào đây'}">
       <button data-action="test-ai" data-provider="${k}">Lưu và kiểm tra kết nối</button>
       <p class="msg" id="aimsg-${k}"></p>
@@ -1051,6 +1169,11 @@ const actions = {
 
   'open-onboard'() { openOnboard(); },
   'cancel-onboard'() { enterApp(); },
+  'pick-plan'(btn) {
+    collectOnboard(); // giữ key đang dán dở
+    setPlan(btn.dataset.provider, btn.dataset.plan);
+    renderGuides();
+  },
   async 'test-ai'(btn) {
     const k = btn.dataset.provider;
     collectOnboard();
@@ -1253,6 +1376,17 @@ document.addEventListener('change', async e => {
   }
   if (e.target.dataset.change === 'show-pass') {
     e.target.dataset.target.split(',').forEach(id => { $('#' + id).type = e.target.checked ? 'text' : 'password'; });
+    return;
+  }
+  if (e.target.dataset.change === 'pick-plan-preset') {
+    const id = e.target.value, pre = PLAN_PRESETS[id];
+    setting().planPick = id;
+    if (pre) {
+      Object.entries(pre.plans).forEach(([k, p]) => setPlan(k, p));
+      if (pre.stt) { $('#sttSel').value = pre.stt; $('#sttModel').value = AI[pre.stt].sttModel || ''; }
+      if (pre.llm) { $('#llmSel').value = pre.llm; $('#llmModel').value = AI[pre.llm].llmModel || ''; }
+    }
+    renderPlanAdvice(); renderGuides();
     return;
   }
   if (e.target.dataset.change !== 'pick-ai') return;

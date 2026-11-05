@@ -119,10 +119,10 @@
     <div data-stepper="2" id="onboardStepper"></div>
     <h1>Kết nối AI của bạn</h1>
     <p class="muted">App dùng AI cho 2 việc: <b>chép lời</b> file ghi âm, rồi <b>phân tích</b> nội dung. Bạn dùng tài khoản AI của chính mình, nên chi phí và dữ liệu đi theo tài khoản của bạn. Chỉ cần làm 1 lần.</p>
-    <div class="callout">
-      <b>Gợi ý nhanh:</b> nếu bạn chỉ có 1 tài khoản, chọn <b>ChatGPT</b> hoặc <b>Gemini</b> cho cả 2 bước là đủ, chỉ cần 1 key.
-      Nếu muốn phân tích tốt nhất, chọn ChatGPT hoặc Gemini để chép lời và <b>Claude</b> để phân tích.
-    </div>
+    <label for="planPick">Bạn đang trả tiền cho gói AI nào?</label>
+    <select id="planPick" data-change="pick-plan-preset"></select>
+    <div class="callout" id="planAdvice"></div>
+    <p class="muted small">Gói chat (ChatGPT, Claude, Gemini) và API là hai thứ tính tiền riêng. App cần key API. Một số gói cao cấp có kèm credit API hằng tháng, hướng dẫn bên dưới sẽ chỉ cách nhận.</p>
     <label for="sttSel">Việc 1 — Chuyển giọng nói thành chữ</label>
     <select id="sttSel" data-change="pick-ai"></select>
     <p id="sttNote" class="warn"></p>
